@@ -3,6 +3,7 @@ package com.example.mychatapplication;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.swiperefreshlayout.widget.CircularProgressDrawable;
 
 import android.app.ProgressDialog;
@@ -31,7 +32,7 @@ import java.util.HashMap;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
-public class SetupActivity extends AppCompatActivity {
+public class  SetupActivity extends AppCompatActivity {
     private static final int REQUEST_CODE = 101;
     CircleImageView profileImageView;
     TextView inputUsername, inputCity, inputProfession, inputCountry;
@@ -42,7 +43,7 @@ public class SetupActivity extends AppCompatActivity {
     DatabaseReference mRef;
     StorageReference storageRef;
     ProgressDialog mProgressBar;
-
+    Toolbar toolbar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +61,10 @@ public class SetupActivity extends AppCompatActivity {
         mUser = mAuth.getCurrentUser();
         mRef = FirebaseDatabase.getInstance().getReference().child("Users");
         storageRef = FirebaseStorage.getInstance().getReference().child("ProfileImages");
+
+        toolbar = findViewById(R.id.app_bar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle("Create Profile");
 
         mProgressBar = new ProgressDialog(this);
 
