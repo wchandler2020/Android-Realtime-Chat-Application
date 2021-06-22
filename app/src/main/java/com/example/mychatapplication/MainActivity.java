@@ -1,19 +1,27 @@
 package com.example.mychatapplication;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -22,21 +30,34 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.squareup.picasso.Picasso;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener{
+    private static final int REQUEST_CODE = 101;
     Toolbar toolbar;
     DrawerLayout drawerLayout;
     NavigationView navigationView;
     View view;
     FirebaseAuth mAuth;
     FirebaseUser mUser;
-    DatabaseReference mUserRef;
+    DatabaseReference mUserRef, PostRef;
     String profileImageUrlV, userNameV;
     CircleImageView profileImageHeader;
     TextView userNameHeader;
+    ImageView addImagePost, sendImagePost;
+    EditText inputPostDesc;
+    Uri imageUrl;
+    ProgressDialog mLoadingBar;
+    StorageReference postImageRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,11 +72,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         drawerLayout=findViewById(R.id.drawlayout);
         navigationView=findViewById(R.id.navView);
+        addImagePost = findViewById(R.id.addImagePost);
+        sendImagePost = findViewById(R.id.send_post_imageView);
+        inputPostDesc = findViewById(R.id.inputAddPost);
+        mLoadingBar = new ProgressDialog(this);
+
 
         mAuth = FirebaseAuth.getInstance();
         mUser = mAuth.getCurrentUser();
         mUserRef = FirebaseDatabase.getInstance().getReference().child("Users");
-
+        PostRef = FirebaseDatabase.getInstance().getReference().child("Posts");
+        postImageRef = FirebaseStorage.getInstance().getReference().child("PostImages");
 
 
         view = navigationView.inflateHeaderView(R.layout.drawer_header);
@@ -63,6 +90,95 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         userNameHeader = view.findViewById(R.id.username_header);
 
         navigationView.setNavigationItemSelectedListener((this));
+
+        sendImagePost.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                AddPost();
+            }
+        });
+        addImagePost.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/*");
+                startActivityForResult(intent, REQUEST_CODE);
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == REQUEST_CODE && resultCode == RESULT_OK && data != null)
+        {
+            imageUrl = data.getData();
+            addImagePost.setImageURI(imageUrl);
+        }
+    }
+
+    private void AddPost() {
+        String postDes = inputPostDesc.getText().toString();
+        if(postDes.isEmpty() || postDes.length() < 3)
+        {
+            inputPostDesc.setError("Your post must contain more than 3 characters.");
+        }
+        else if(imageUrl == null)
+        {
+            Toast.makeText(this, "Please select an image", Toast.LENGTH_SHORT).show();
+        }
+        else
+        {
+            mLoadingBar.setTitle("Creating your post now.");
+            mLoadingBar.setCanceledOnTouchOutside(false);
+            mLoadingBar.show();
+
+            postImageRef.child(mUser.getUid()).putFile(imageUrl).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+                    if(task.isSuccessful())
+                    {
+                        postImageRef.child(mUser.getUid()).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                            @Override
+                            public void onSuccess(Uri uri) {
+                                Date date = new Date();
+                                SimpleDateFormat formatter = new SimpleDateFormat("dd-M-yyyy hh:mm:ss");
+                                String strDate = formatter.format(date);
+
+                                HashMap hashMap = new HashMap();
+                                hashMap.put("datePosted", strDate);
+                                hashMap.put("postImageUrl", uri.toString());
+                                hashMap.put("postDesc", postDes);
+                                hashMap.put("userProfileImageUrl", profileImageUrlV);
+
+                                PostRef.child(mUser.getUid()).updateChildren(hashMap).addOnCompleteListener(new OnCompleteListener() {
+                                    @Override
+                                    public void onComplete(@NonNull Task task) {
+                                        if(task.isSuccessful())
+                                        {
+                                            mLoadingBar.dismiss();
+                                            Toast.makeText(MainActivity.this, "Your post has been successfully added.", Toast.LENGTH_SHORT).show();
+                                            addImagePost.setImageURI(null);
+                                            inputPostDesc.setText("");
+                                        }
+                                        else
+                                        {
+                                            mLoadingBar.dismiss();
+                                            Toast.makeText(MainActivity.this, "" + task.getException().toString(), Toast.LENGTH_SHORT).show();
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    else
+                    {
+                        mLoadingBar.dismiss();
+                        Toast.makeText(MainActivity.this, "" + task.getException().toString(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
     }
 
     @Override
@@ -81,6 +197,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     {
                         profileImageUrlV = dataSnapshot.child("profileImage").getValue().toString();
                         userNameV = dataSnapshot.child("username").getValue().toString();
+                        //Picasso is an image downloading and caching library
                         Picasso.get().load(profileImageUrlV).into(profileImageHeader);
                         userNameHeader.setText(userNameV);
                     }
