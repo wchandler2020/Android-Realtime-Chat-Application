@@ -6,19 +6,26 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.mychatapplication.Utils.Posts;
+import com.firebase.ui.database.FirebaseRecyclerAdapter;
+import com.firebase.ui.database.FirebaseRecyclerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -58,6 +65,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     Uri imageUrl;
     ProgressDialog mLoadingBar;
     StorageReference postImageRef;
+    FirebaseRecyclerAdapter<Posts, MyViewHolder>adapter;
+    FirebaseRecyclerOptions<Posts>options;
+    RecyclerView recyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,6 +85,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         addImagePost = findViewById(R.id.addImagePost);
         sendImagePost = findViewById(R.id.send_post_imageView);
         inputPostDesc = findViewById(R.id.inputAddPost);
+        recyclerView = findViewById(R.id.recyclerview);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+
         mLoadingBar = new ProgressDialog(this);
 
 
@@ -105,6 +118,31 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 startActivityForResult(intent, REQUEST_CODE);
             }
         });
+        LoadPost();
+    }
+
+    private void LoadPost() {
+        options = new FirebaseRecyclerOptions.Builder<Posts>().setQuery(PostRef, Posts.class).build();
+        adapter = new FirebaseRecyclerAdapter<Posts, MyViewHolder>(options) {
+            @Override
+            protected void onBindViewHolder(@NonNull MyViewHolder holder, int position, @NonNull Posts model) {
+                holder.postDesc.setText(model.getPostDesc());
+                holder.timeAgo.setText(model.getDatePosted());
+                holder.postUsername.setText(model.getUsername());
+                Picasso.get().load(model.getPostImageUrl()).into(holder.postImage);
+                Picasso.get().load(model.getUserProfileImageUrl()).into(holder.profileImagePost);
+
+            }
+
+            @NonNull
+            @Override
+            public MyViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.single_view_post, parent, false);
+                return new MyViewHolder(view);
+            }
+        };
+        adapter.startListening();
+        recyclerView.setAdapter(adapter);
     }
 
     @Override
@@ -133,32 +171,35 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             mLoadingBar.setCanceledOnTouchOutside(false);
             mLoadingBar.show();
 
-            postImageRef.child(mUser.getUid()).putFile(imageUrl).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+            Date date = new Date();
+            SimpleDateFormat formatter = new SimpleDateFormat("dd-M-yyyy hh:mm:ss");
+            final String strDate = formatter.format(date);
+
+
+            postImageRef.child(mUser.getUid()+strDate).putFile(imageUrl).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
                 @Override
                 public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
                     if(task.isSuccessful())
                     {
-                        postImageRef.child(mUser.getUid()).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                        postImageRef.child(mUser.getUid()+strDate).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
                             @Override
                             public void onSuccess(Uri uri) {
-                                Date date = new Date();
-                                SimpleDateFormat formatter = new SimpleDateFormat("dd-M-yyyy hh:mm:ss");
-                                String strDate = formatter.format(date);
 
                                 HashMap hashMap = new HashMap();
                                 hashMap.put("datePosted", strDate);
                                 hashMap.put("postImageUrl", uri.toString());
                                 hashMap.put("postDesc", postDes);
                                 hashMap.put("userProfileImageUrl", profileImageUrlV);
+                                hashMap.put("username", userNameV);
 
-                                PostRef.child(mUser.getUid()).updateChildren(hashMap).addOnCompleteListener(new OnCompleteListener() {
+                                PostRef.child(mUser.getUid()+strDate).updateChildren(hashMap).addOnCompleteListener(new OnCompleteListener() {
                                     @Override
                                     public void onComplete(@NonNull Task task) {
                                         if(task.isSuccessful())
                                         {
                                             mLoadingBar.dismiss();
                                             Toast.makeText(MainActivity.this, "Your post has been successfully added.", Toast.LENGTH_SHORT).show();
-                                            addImagePost.setImageURI(null);
+                                            addImagePost.setImageResource(R.drawable.ic_add_post_image);
                                             inputPostDesc.setText("");
                                         }
                                         else
