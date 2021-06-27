@@ -11,8 +11,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -42,9 +44,11 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.squareup.picasso.Picasso;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.TimeZone;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
@@ -56,7 +60,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     View view;
     FirebaseAuth mAuth;
     FirebaseUser mUser;
-    DatabaseReference mUserRef, PostRef;
+    DatabaseReference mUserRef, PostRef, LikeRef;
     String profileImageUrlV, userNameV;
     CircleImageView profileImageHeader;
     TextView userNameHeader;
@@ -95,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         mUser = mAuth.getCurrentUser();
         mUserRef = FirebaseDatabase.getInstance().getReference().child("Users");
         PostRef = FirebaseDatabase.getInstance().getReference().child("Posts");
+        LikeRef = FirebaseDatabase.getInstance().getReference().child("Likes");
         postImageRef = FirebaseStorage.getInstance().getReference().child("PostImages");
 
 
@@ -126,11 +131,41 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         adapter = new FirebaseRecyclerAdapter<Posts, MyViewHolder>(options) {
             @Override
             protected void onBindViewHolder(@NonNull MyViewHolder holder, int position, @NonNull Posts model) {
+                String postKey = getRef(position).getKey();
                 holder.postDesc.setText(model.getPostDesc());
-                holder.timeAgo.setText(model.getDatePosted());
+                String timeAgo = CalculateTimeAgo(model.getDatePosted());
+                holder.timeAgo.setText(timeAgo);
                 holder.postUsername.setText(model.getUsername());
                 Picasso.get().load(model.getPostImageUrl()).into(holder.postImage);
                 Picasso.get().load(model.getUserProfileImageUrl()).into(holder.profileImagePost);
+
+                holder.likeImage.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        LikeRef.child(postKey).child(mUser.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                if(snapshot.exists())
+                                {
+                                    LikeRef.child(postKey).child(mUser.getUid()).removeValue();
+                                    holder.likeImage.setColorFilter(Color.GRAY);
+                                    notifyDataSetChanged();
+                                }
+                                else
+                                {
+                                    LikeRef.child(postKey).child(mUser.getUid()).setValue("like");
+                                    holder.likeImage.setColorFilter(Color.BLUE);
+                                    notifyDataSetChanged();
+                                }
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                    Toast.makeText(MainActivity.this, ""+error.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                });
 
             }
 
@@ -143,6 +178,20 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         };
         adapter.startListening();
         recyclerView.setAdapter(adapter);
+    }
+
+    private String CalculateTimeAgo(String datePosted) {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-M-yyyy hh:mm:ss");
+        try {
+            long time = sdf.parse(datePosted).getTime();
+            long now = System.currentTimeMillis();
+            CharSequence ago =
+                    DateUtils.getRelativeTimeSpanString(time, now, DateUtils.MINUTE_IN_MILLIS);
+            return ago + "";
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     @Override
