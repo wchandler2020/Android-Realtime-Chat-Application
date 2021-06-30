@@ -2,6 +2,7 @@ package com.example.mychatapplication;
 
 import android.graphics.Color;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -19,8 +20,11 @@ import de.hdodenhof.circleimageview.CircleImageView;
 
 public class MyViewHolder extends RecyclerView.ViewHolder {
     CircleImageView profileImagePost;
-    ImageView postImage, likeImage, commentsImage;
+    ImageView postImage, likeImage, sendComments, commentsImage;
     TextView postUsername, timeAgo, postDesc, likeCounter, commentsCounter;
+    EditText inputComments;
+    public static RecyclerView recyclerView;
+
     public MyViewHolder(@NonNull View itemView) {
         super(itemView);
 
@@ -33,6 +37,11 @@ public class MyViewHolder extends RecyclerView.ViewHolder {
         commentsImage = itemView.findViewById(R.id.commentsImage);
         likeCounter = itemView.findViewById(R.id.likeCounter);
         commentsCounter = itemView.findViewById(R.id.commentsCounter);
+        inputComments = itemView.findViewById(R.id.inputComments);
+        sendComments = itemView.findViewById(R.id.sendComments);
+        recyclerView = itemView.findViewById(R.id.recyclerViewComments);
+
+
     }
 
     public void countLikes(String postKey, String uid, DatabaseReference likeRef) {
@@ -65,6 +74,28 @@ public class MyViewHolder extends RecyclerView.ViewHolder {
                 else
                 {
                     likeImage.setColorFilter(Color.GRAY);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+
+            }
+        });
+    }
+
+    public void countComments(String postKey, String uid, DatabaseReference commentRef) {
+        commentRef.child(postKey).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if(snapshot.exists())
+                {
+                    int totalComments = (int) snapshot.getChildrenCount();
+                    commentsCounter.setText(totalComments+"");
+                }
+                else
+                {
+                    commentsCounter.setText("0");
                 }
             }
 
