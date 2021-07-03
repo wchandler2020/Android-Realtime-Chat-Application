@@ -387,7 +387,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 Toast.makeText(this, "Friends", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.findFriends:
-                Toast.makeText(this, "Add Friends", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(MainActivity.this, FindFriendActivity.class));
                 break;
             case R.id.chat:
                 Toast.makeText(this, "Chat", Toast.LENGTH_SHORT).show();
