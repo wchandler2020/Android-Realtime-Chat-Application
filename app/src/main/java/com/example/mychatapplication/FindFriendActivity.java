@@ -7,10 +7,14 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.app.DownloadManager;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.SearchView;
 
 import com.example.mychatapplication.Utils.Users;
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
@@ -61,10 +65,26 @@ public class FindFriendActivity extends AppCompatActivity {
         adapter = new FirebaseRecyclerAdapter<Users, FindFriendViewHolder>(options) {
             @Override
             protected void onBindViewHolder(@NonNull FindFriendViewHolder holder, int position, Users model) {
-                Picasso.get().load(model.getProfileImage()).into(holder.profileImage);
-                holder.username.setText(model.getUsername());
-                holder.profession.setText(model.getProfession());
+                if(!mUser.getUid().equals(getRef(position).getKey().toString()))
+                {
+                    Picasso.get().load(model.getProfileImage()).into(holder.profileImage);
+                    holder.username.setText(model.getUsername());
+                    holder.profession.setText(model.getProfession());
+                }
+                else
+                    {
+                    holder.itemView.setVisibility(View.GONE);
+                    holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(0,0));
+                }
 
+                holder.itemView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        Intent intent = new Intent(FindFriendActivity.this, ViewFriendActivity.class);
+                        intent.putExtra("userKey",getRef(position).getKey().toString());
+                        startActivity(intent);
+                    }
+                });
             }
 
             @NonNull
@@ -76,5 +96,25 @@ public class FindFriendActivity extends AppCompatActivity {
         };
         adapter.startListening();
         recyclerView.setAdapter(adapter);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.search_menu, menu);
+        MenuItem menuItem = menu.findItem(R.id.search);
+        SearchView searchView = (SearchView) menuItem.getActionView();
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String s) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String s) {
+                LoadUsers(s);
+                return false;
+            }
+        });
+        return true;
     }
 }
